@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat with Sandesh AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            overflow: hidden;
+        }
+
+        .user-message,
+        .bot-message {
+            margin: 0.5rem 0;
+            padding: 0.75rem;
+            white-space: pre-wrap;
+            max-width: 75%;
+            border-radius: 1rem;
+        }
+
+        .user-message {
+            background-color: #4a90e2;
+            color: white;
+            align-self: flex-end;
+            text-align: right;
+            border-radius: 1rem 1rem 0 1rem;
+        }
+
+        .bot-message {
+            background-color: #e0f7fa;
+            color: #333;
+            align-self: flex-start;
+            text-align: left;
+            border-radius: 1rem 1rem 1rem 0;
+        }
+
+        .chat-log {
+            display: flex;
+            flex-direction: column;
+            max-height: calc(90vh - 200px);
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .input-container {
+            padding: 1rem;
+        }
+
+        pre {
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            font-size: 0.875rem;
+            font-family: 'Courier New', Courier, monospace;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+        }
+
+        .inline-code {
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.375rem;
+            font-family: 'Courier New', Courier, monospace;
+            display: inline;
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center min-h-screen p-4">
+    <div class="chat-container w-full max-w-3xl h-[90vh] bg-white rounded-2xl shadow-xl flex flex-col">
+        <div
+            class="header bg-gradient-to-r from-blue-600 to-blue-400 text-white p-5 flex justify-between items-center rounded-t-2xl">
+            <span class="text-2xl font-semibold">Chat with Sandesh AI</span>
+            <button
+                class="new-conversation-btn hoverable-button bg-gradient-to-r from-red-600 to-orange-400 text-white py-2 px-4 rounded-full shadow-lg"
+                onclick="startNewConversation()">New Conversation</button>
+        </div>
+        <div class="chat-box flex-1 p-5 bg-gray-100 flex flex-col">
+            <div class="chat-log" id="chat-log">
+                <!-- Chat messages will appear here -->
+            </div>
+        </div>
+        <div class="input-container flex bg-white shadow-lg">
+            <textarea id="user-input" placeholder="Type your message..."
+                class="flex-1 p-4 text-lg border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-400 transition duration-300"
+                rows="1" onkeypress="handleKeyPress(event)" style="max-height: 120px; overflow-y: auto;"></textarea>
+            <button onclick="sendMessage()"
+                class="hoverable-button ml-3 bg-gradient-to-r from-blue-600 to-blue-400 text-white py-3 px-5 rounded-full shadow-lg">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyDHE95QRthILTWt0sRLc2WnrmIvsO84lRw';  // Replace with your Gemini API key
+        let chatHistory = [];
+
+        function formatMessage(content) {
+            // Convert triple and double backticks to <pre><code> for block code
+            const blockCodeRegex = /```([\s\S]*?)```|``([\s\S]*?)``/g;
+            content = content.replace(blockCodeRegex, match => {
+                return `<pre><code class="language-javascript">${match.replace(/```|``/g, '')}</code></pre>`; // Change language as needed
+            });
+
+            // Convert inline single backticks to <span class="inline-code"> for inline code
+            const singleBacktickRegex = /`([^`]+)`/g;
+            content = content.replace(singleBacktickRegex, '<span class="inline-code">$1</span>');
+
+            // Convert bold text (double asterisks) to <strong>
+            const boldRegex = /\*\*(.*?)\*\*/g;
+            content = content.replace(boldRegex, '<strong>$1</strong>');
+
+            return content;
+        }
+
+        function displayMessage(role, content) {
+            const chatLog = document.getElementById('chat-log');
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', role === 'user' ? 'user-message' : 'bot-message');
+            messageDiv.innerHTML = formatMessage(content);
+            chatLog.appendChild(messageDiv);
+            chatLog.scrollTop = chatLog.scrollHeight;
+
+            // Apply syntax highlighting after adding the new message
+            Prism.highlightAll();
+        }
+
+        function sendMessage() {
+            const userInput = document.getElementById('user-input').value.trim();
+            if (!userInput) return;
+
+            displayMessage('user', userInput);
+            chatHistory.push({ role: 'user', content: userInput });
+
+            fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text: userInput
+                        }]
+                    }]
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't understand the response.";
+                    displayMessage('bot', reply);
+                    chatHistory.push({ role: 'bot', content: reply });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    displayMessage('bot', "Sorry, there was an error. Please try again.");
+                });
+
+            document.getElementById('user-input').value = '';
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function startNewConversation() {
+            chatHistory = [];
+            document.getElementById('chat-log').innerHTML = '';
+            document.getElementById('user-input').value = '';
+        }
+
+        // Load previous messages from chatHistory when the page is reloaded
+        window.onload = function () {
+            chatHistory.forEach(message => {
+                displayMessage(message.role, message.content);
+            });
+        };
+    </script>
+
+</body>
+
+</html>
